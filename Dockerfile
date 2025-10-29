@@ -6,4 +6,4 @@ COPY . .
 
 RUN pip install -r requirements.txt
 
-CMD ["python", "add_new_user.py"]
+CMD ["python", "backend/main.py"]

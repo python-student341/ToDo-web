@@ -1,7 +1,7 @@
 from pydantic import EmailStr, Field, BaseModel
 from datetime import datetime
 
-class UserShema(BaseModel):
+class UserSchema(BaseModel):
     email: EmailStr
     name: str = Field(min_length=1, max_length=10, pattern=r'^[a-zA-Zа-яА-Я\s]+$')
     password: str = Field(min_length=8, max_length=25, pattern=r'^[a-zA-Z0-9@#$%^&+=]+$')
@@ -12,6 +12,21 @@ class UserLoginSchema(BaseModel):
     email: EmailStr
     password: str
 
+class PasswordSchema(BaseModel):
+    old_password: str = Field(min_length=8, max_length=25, pattern=r'^[a-zA-Z0-9@#$%^&+=]+$')
+    new_password: str = Field(min_length=8, max_length=25, pattern=r'^[a-zA-Z0-9@#$%^&+=]+$')
+    repeat_new_password: str = Field(min_length=8, max_length=25, pattern=r'^[a-zA-Z0-9@#$%^&+=]+$')
+
+class UserDeleteSchema(BaseModel):
+    password: str = Field(min_length=8, max_length=25, pattern=r'^[a-zA-Z0-9@#$%^&+=]+$')
+
+class UserNameSchema(BaseModel):
+    name: str = Field(min_length=1, max_length=10, pattern=r'^[a-zA-Zа-яА-Я\s]+$')
+    password: str = Field(min_length=8, max_length=25, pattern=r'^[a-zA-Z0-9@#$%^&+=]+$')
+
 class ToDoSchema(BaseModel):
-    task: str = Field(min_length=5, max_length=25, pattern=r'^[a-zA-Zа-яА-Я\s.?!]+$')
+    task: str = Field(min_length=4, max_length=25, pattern=r'^[a-zA-Zа-яА-Я\s.?!]+$')
     date: datetime
+
+class SubToDoSchema(BaseModel):
+    task: str = Field(min_length=4, max_length=25, pattern=r'^[a-zA-Zа-яА-Я\s.?!]+$')

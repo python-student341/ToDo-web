@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from fastapi import Depends
 from dotenv import load_dotenv
 
-from backend.database.hash import config
+from database.hash import config
 
 env = Env()
 

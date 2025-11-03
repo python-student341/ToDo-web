@@ -2,7 +2,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import ForeignKey
 from datetime import datetime
 
-from backend.database.database import Base
+from database.database import Base
 
 class UserModel(Base):
     __tablename__ = 'users'
@@ -23,3 +23,13 @@ class ToDoModel(Base):
     date: Mapped[datetime] = mapped_column()
 
     user = relationship('UserModel', back_populates='todos')
+    subtodos = relationship('SubToDoModel', back_populates='todo')
+
+class SubToDoModel(Base):
+    __tablename__ = 'SubToDo'
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    todo_id: Mapped[int] = mapped_column(ForeignKey('ToDo.id'))
+    task: Mapped[str] = mapped_column()
+
+    todo = relationship('ToDoModel', back_populates='subtodos')

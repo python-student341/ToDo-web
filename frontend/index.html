@@ -13,15 +13,20 @@
     .btn-red { background:#ef4444; }
     .muted { color:#93a0b0 }
     .small { font-size:13px }
-    .task { background:#0f1a2b; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.02); display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .task { background:#0f1a2b; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.02); display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap: wrap; }
     .icon-btn { display:flex; gap:10px; align-items:center; }
-    .delete-btn, .edit-btn, .save-btn { cursor:pointer; transition:all 0.2s ease; }
+    .delete-btn, .edit-btn, .save-btn, .add-subtask-btn { cursor:pointer; transition:all 0.2s ease; }
     .delete-btn { color:#ef4444; }
     .edit-btn { color:#3b82f6; }
     .save-btn { color:#10b981; }
+    .add-subtask-btn { color:#f59e0b; }
     .delete-btn:hover { color:#f87171; transform:scale(1.15); }
     .edit-btn:hover { color:#60a5fa; transform:scale(1.15); }
     .save-btn:hover { color:#34d399; transform:scale(1.15); }
+    .add-subtask-btn:hover { color:#fbbf24; transform:scale(1.15); }
+    .subtask { margin-left: 2rem; background:#111a2d; padding:8px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; }
+    .modal-bg {position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;}
+    .modal {background:#0b1220;padding:20px;border-radius:12px;width:320px;}
   </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-6">
@@ -74,185 +79,220 @@
         </div>
       </div>
 
+      <div class="flex gap-2 mb-4">
+        <button id="changeNameBtn" class="btn small">Изменить имя</button>
+        <button id="changePassBtn" class="btn small" style="background:#8b5cf6">Изменить пароль</button>
+        <button id="deleteUserBtn" class="btn btn-red small">Удалить пользователя</button>
+      </div>
+
       <div class="mb-4 flex gap-3">
         <input id="taskText" class="input flex-1" placeholder="Текст задачи"/>
         <input id="taskDate" class="input w-48" type="datetime-local"/>
         <button id="addTaskBtn" class="btn">Добавить</button>
       </div>
 
-      <div id="tasksList" class="space-y-3 max-h-64 overflow-auto mb-4"></div>
-
-      <div class="small muted mb-2">Теперь можно редактировать задачи ✏️ прямо в карточке!</div>
+      <div id="tasksList" class="space-y-3 max-h-96 overflow-auto mb-4"></div>
+      <div class="small muted mb-2">Теперь можно редактировать задачи ✏️, удалять ❌ и добавлять подзадачи ➕</div>
     </div>
 
   </div>
 
+  <!-- MODALS -->
+  <div id="modalBg" class="modal-bg">
+    <div id="modalContent" class="modal"></div>
+  </div>
+
 <script>
-// Используем текущий домен Render
 const API_URL = location.origin;
 document.getElementById('apiUrlDisplay').textContent = API_URL;
 
-// переключение режимов
-const auth = document.getElementById('auth');
-const cabinet = document.getElementById('cabinet');
-document.getElementById('gotoRegister').onclick = () => { auth.querySelector('#mode-login').style.display = 'none'; auth.querySelector('#mode-register').style.display = 'block'; };
-document.getElementById('gotoLogin').onclick = () => { auth.querySelector('#mode-register').style.display = 'none'; auth.querySelector('#mode-login').style.display = 'block'; };
+function setCookieToken(token){const days=7;const expires=new Date(Date.now()+days*86400000).toUTCString();document.cookie=`token=${token}; path=/; expires=${expires}`;}
+function getCookie(name){const v=document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');return v?v.pop():'';}
+function decodeJwt(token){try{return JSON.parse(atob(token.split('.')[1]));}catch(e){return {};}}
+function openModal(html){const bg=document.getElementById('modalBg');const c=document.getElementById('modalContent');c.innerHTML=html;bg.style.display='flex';}
+function closeModal(){document.getElementById('modalBg').style.display='none';}
+document.getElementById('modalBg').onclick=(e)=>{if(e.target.id==='modalBg')closeModal();};
 
-function setCookieToken(token) {
-  const days = 7;
-  const expires = new Date(Date.now() + days*86400000).toUTCString();
-  document.cookie = `token=${token}; path=/; expires=${expires}`;
-}
-function getCookie(name) {
-  const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-  return v ? v.pop() : '';
-}
+let currentUserId=null;
 
-// LOGIN
-document.getElementById('loginBtn').onclick = async () => {
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value.trim();
-  if (!email || !password) return alert('Введите email и пароль');
-  const res = await fetch(`${API_URL}/login`, { 
-    method:'POST', 
-    headers:{'Content-Type':'application/json'}, 
-    body:JSON.stringify({ email, password }) 
-  });
-  const data = await res.json();
-  if (data.success) {
-    if (data.token) setCookieToken(data.token);
+const auth=document.getElementById('auth');
+const cabinet=document.getElementById('cabinet');
+document.getElementById('gotoRegister').onclick=()=>{auth.querySelector('#mode-login').style.display='none';auth.querySelector('#mode-register').style.display='block';};
+document.getElementById('gotoLogin').onclick=()=>{auth.querySelector('#mode-register').style.display='none';auth.querySelector('#mode-login').style.display='block';};
+
+document.getElementById('loginBtn').onclick=async()=>{
+  const email=emailInput.value.trim(),password=passwordInput.value.trim();
+  if(!email||!password)return alert('Введите email и пароль');
+  const res=await fetch(`${API_URL}/users/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+  const data=await res.json();
+  if(data.success){
+    if(data.token)setCookieToken(data.token);
+    const decoded=decodeJwt(data.token);
+    currentUserId=parseInt(decoded.sub);
     openCabinet(email);
-    await loadTasks();
-  } else alert(data.msg || 'Ошибка входа');
+    loadTasks();
+  } else alert(data.msg||'Ошибка входа');
+};
+const emailInput=document.getElementById('email');
+const passwordInput=document.getElementById('password');
+
+document.getElementById('registerBtn').onclick=async()=>{
+  const name=reg_name.value.trim(),age=parseInt(reg_age.value),email=reg_email.value.trim(),password=reg_password.value.trim(),repeat_password=reg_repeat_password.value.trim();
+  if(!name||!age||!email||!password||!repeat_password)return alert('Заполни все поля');
+  const res=await fetch(`${API_URL}/users/add_new_user`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,age,email,password,repeat_password})});
+  const data=await res.json();
+  if(data.success){alert('Успешная регистрация');document.getElementById('gotoLogin').click();}
+  else alert(data.detail||data.msg||'Ошибка регистрации');
 };
 
-// REGISTER
-document.getElementById('registerBtn').onclick = async () => {
-  const name = reg_name.value.trim();
-  const age = parseInt(reg_age.value);
-  const email = reg_email.value.trim();
-  const password = reg_password.value.trim();
-  const repeat_password = reg_repeat_password.value.trim();
-  if (!name || !age || !email || !password || !repeat_password) return alert('Заполни все поля');
-  const res = await fetch(`${API_URL}/users`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ name, age, email, password, repeat_password })
-  });
-  const data = await res.json();
-  if (data.success) {
-    alert('Успешная регистрация');
-    document.getElementById('gotoLogin').click();
-  } else alert(data.detail || data.msg || 'Ошибка регистрации');
+function openCabinet(email){auth.style.display='none';cabinet.style.display='block';document.getElementById('userEmail').textContent=email;}
+document.getElementById('logoutBtn').onclick=()=>{document.cookie='token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';cabinet.style.display='none';auth.style.display='block';};
+
+// === МОДАЛЫ для изменения и удаления ===
+document.getElementById('changeNameBtn').onclick=()=>{
+  openModal(`
+    <h3 class="text-lg font-bold mb-3">Изменить имя</h3>
+    <input id="newName" class="input w-full mb-2" placeholder="Новое имя"/>
+    <input id="passForName" class="input w-full mb-4" type="password" placeholder="Пароль"/>
+    <div class="flex gap-2 justify-end">
+      <button onclick="closeModal()" class="btn small" style="background:#64748b">Отмена</button>
+      <button onclick="saveNewName()" class="btn small">Сохранить</button>
+    </div>`);
 };
 
-function openCabinet(email) {
-  auth.style.display = 'none';
-  cabinet.style.display = 'block';
-  document.getElementById('userEmail').textContent = email;
+async function saveNewName(){
+  const name=document.getElementById('newName').value.trim();
+  const password=document.getElementById('passForName').value.trim();
+  if(!name||!password)return alert('Заполните все поля');
+  const res=await fetch(`${API_URL}/users/change_name/${currentUserId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,password})});
+  const data=await res.json();
+  alert(data.message||data.msg||'Ошибка');
+  if(data.success)closeModal();
 }
-document.getElementById('logoutBtn').onclick = () => {
-  document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-  cabinet.style.display = 'none';
-  auth.style.display = 'block';
+
+document.getElementById('changePassBtn').onclick=()=>{
+  openModal(`
+    <h3 class="text-lg font-bold mb-3">Изменить пароль</h3>
+    <input id="oldPass" class="input w-full mb-2" type="password" placeholder="Старый пароль"/>
+    <input id="newPass" class="input w-full mb-2" type="password" placeholder="Новый пароль"/>
+    <input id="repeatPass" class="input w-full mb-4" type="password" placeholder="Повторите новый пароль"/>
+    <div class="flex gap-2 justify-end">
+      <button onclick="closeModal()" class="btn small" style="background:#64748b">Отмена</button>
+      <button onclick="saveNewPassword()" class="btn small">Сохранить</button>
+    </div>`);
 };
 
-// ADD TASK
-document.getElementById('addTaskBtn').onclick = async () => {
-  const task = document.getElementById('taskText').value.trim();
-  const date = document.getElementById('taskDate').value || new Date().toISOString();
-  if (!task) return alert('Введите текст задачи');
-  const res = await fetch(`${API_URL}/add_task`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ task, date })
-  });
-  const data = await res.json();
-  if (data.success) {
-    document.getElementById('taskText').value = '';
-    document.getElementById('taskDate').value = '';
-    await loadTasks();
-  } else alert(data.msg || 'Ошибка добавления');
+async function saveNewPassword(){
+  const old=document.getElementById('oldPass').value.trim();
+  const n1=document.getElementById('newPass').value.trim();
+  const n2=document.getElementById('repeatPass').value.trim();
+  if(!old||!n1||!n2)return alert('Заполните все поля');
+  const res=await fetch(`${API_URL}/users/change_password/${currentUserId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_password:old,new_password:n1,repeat_new_password:n2})});
+  const data=await res.json();
+  alert(data.message||data.msg||'Ошибка');
+  if(data.success)closeModal();
+}
+
+document.getElementById('deleteUserBtn').onclick=()=>{
+  openModal(`
+    <h3 class="text-lg font-bold mb-3 text-red-400">Удалить пользователя</h3>
+    <p class="small muted mb-2">Введите пароль для подтверждения:</p>
+    <input id="deletePass" class="input w-full mb-4" type="password" placeholder="Пароль"/>
+    <div class="flex gap-2 justify-end">
+      <button onclick="closeModal()" class="btn small" style="background:#64748b">Отмена</button>
+      <button onclick="confirmDeleteUser()" class="btn btn-red small">Удалить</button>
+    </div>`);
 };
 
-// DELETE TASK
-async function deleteTask(id) {
-  const res = await fetch(`${API_URL}/delet_task/${id}`, { method:'DELETE' });
-  const data = await res.json();
-  if (data.success) loadTasks(); else alert(data.message || 'Ошибка удаления');
+async function confirmDeleteUser(){
+  const password=document.getElementById('deletePass').value.trim();
+  if(!password)return alert('Введите пароль');
+  const res=await fetch(`${API_URL}/users/delete_user/${currentUserId}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});
+  const data=await res.json();
+  alert(data.message||data.msg||'Ошибка');
+  if(data.success){closeModal();document.getElementById('logoutBtn').click();}
 }
 
-// SAVE CHANGES
-async function saveTask(taskId, inputText, inputDate) {
-  const newText = inputText.value.trim();
-  const dateISO = new Date(inputDate.value).toISOString();
-  const res = await fetch(`${API_URL}/change_task/${taskId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ task: newText, date: dateISO })
-  });
-  const data = await res.json();
-  if (data.success) loadTasks(); else alert(data.message || 'Ошибка обновления');
+// ====== старый код задач без изменений ======
+const taskText=document.getElementById('taskText'),taskDate=document.getElementById('taskDate');
+document.getElementById('addTaskBtn').onclick=async()=>{
+  const task=taskText.value.trim(),date=taskDate.value||new Date().toISOString();
+  if(!task)return alert('Введите текст задачи');
+  const res=await fetch(`${API_URL}/add_task`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task,date})});
+  const data=await res.json();
+  if(data.success){taskText.value='';taskDate.value='';loadTasks();} else alert(data.msg||'Ошибка добавления');
+};
+
+async function deleteTask(id){const res=await fetch(`${API_URL}/delete_task/${id}`,{method:'DELETE'});const data=await res.json();if(data.success)loadTasks();else alert(data.message||'Ошибка удаления');}
+async function saveTask(taskId,inputText,inputDate){const newText=inputText.value.trim();const dateISO=new Date(inputDate.value).toISOString();const res=await fetch(`${API_URL}/change_task/${taskId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({task:newText,date:dateISO})});const data=await res.json();if(data.success)loadTasks();else alert(data.message||'Ошибка обновления');}
+function editTaskInline(task,container){container.innerHTML=`<div class="flex flex-col flex-1 gap-1"><input class="input w-full" value="${escapeHtml(task.task)}"/><input class="input w-48" type="datetime-local" value="${new Date(task.date).toISOString().slice(0,16)}"/></div><div class="icon-btn"><div class="save-btn" title="Сохранить"><svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div></div>`;const [inputText,inputDate]=container.querySelectorAll('input');container.querySelector('.save-btn').onclick=()=>saveTask(task.id,inputText,inputDate);}
+
+async function addSubtask(todoId){
+  const input=document.createElement('input');
+  input.className='input flex-1';
+  input.placeholder='Введите текст подзадачи...';
+  const subContainer=document.createElement('div');
+  subContainer.className='subtask';
+  subContainer.appendChild(input);
+  const saveBtn=document.createElement('div');
+  saveBtn.className='save-btn';
+  saveBtn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>';
+  subContainer.appendChild(saveBtn);
+  document.getElementById('tasksList').appendChild(subContainer);
+  saveBtn.onclick=async()=>{
+    const text=input.value.trim();if(!text)return;
+    const res=await fetch(`${API_URL}/add_task/add_subtask/${todoId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task:text})});
+    const data=await res.json();if(data.success)loadTasks();else alert(data.message||'Ошибка добавления подзадачи');
+  };
 }
 
-// EDIT TASK
-function editTaskInline(task, container) {
-  container.innerHTML = `
-    <div class="flex flex-col flex-1 gap-1">
-      <input class="input w-full" value="${escapeHtml(task.task)}"/>
-      <input class="input w-48" type="datetime-local" value="${new Date(task.date).toISOString().slice(0,16)}"/>
-    </div>
-    <div class="icon-btn">
-      <div class="save-btn" title="Сохранить">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      </div>
-    </div>
-  `;
-  const [inputText, inputDate] = container.querySelectorAll('input');
-  container.querySelector('.save-btn').onclick = () => saveTask(task.id, inputText, inputDate);
-}
+async function saveSubtask(id,inputText){const newText=inputText.value.trim();const res=await fetch(`${API_URL}/change_subtask/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({task:newText})});const data=await res.json();if(data.success)loadTasks();else alert(data.message||'Ошибка обновления подзадачи');}
+function editSubtaskInline(subtask,container){container.innerHTML=`<input class="input flex-1" value="${escapeHtml(subtask.task)}"/><div class="save-btn" title="Сохранить"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div>`;const inputText=container.querySelector('input');container.querySelector('.save-btn').onclick=()=>saveSubtask(subtask.id,inputText);}
 
-// LOAD TASKS
-async function loadTasks() {
-  const res = await fetch(`${API_URL}/get_tasks`, { method:'GET' });
-  const data = await res.json();
-  const container = document.getElementById('tasksList');
-  container.innerHTML = '';
-  if (!Array.isArray(data) || !data.length) {
-    container.innerHTML = '<div class="muted">Пока нет задач</div>';
-    return;
-  }
-  data.forEach(t => {
-    const d = document.createElement('div');
-    d.className = 'task';
-    d.innerHTML = `
+async function deleteSubtask(id){const res=await fetch(`${API_URL}/delete_subtask/${id}`,{method:'DELETE'});const data=await res.json();if(data.success)loadTasks();else alert(data.message||'Ошибка удаления подзадачи');}
+
+async function loadTasks(){
+  const res=await fetch(`${API_URL}/get_tasks`);
+  const tasks=await res.json();
+  const container=document.getElementById('tasksList');
+  container.innerHTML='';
+  if(!Array.isArray(tasks)||!tasks.length){container.innerHTML='<div class="muted">Пока нет задач</div>';return;}
+  for(const t of tasks){
+    const d=document.createElement('div');
+    d.className='task';
+    d.innerHTML=`
       <div class="flex-1">
         <div class="font-medium">${escapeHtml(t.task)}</div>
         <div class="muted small">${new Date(t.date).toLocaleString()}</div>
       </div>
       <div class="icon-btn">
-        <div class="edit-btn" title="Изменить">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M4 13.5V19h5.5l9.536-9.536a1.5 1.5 0 00-2.122-2.122L4 13.5z"/>
-          </svg>
-        </div>
-        <div class="delete-btn" title="Удалить">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </div>
+        <div class="add-subtask-btn" title="Добавить подзадачу"><svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></div>
+        <div class="edit-btn" title="Изменить"><svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M4 13.5V19h5.5l9.536-9.536a1.5 1.5 0 00-2.122-2.122L4 13.5z"/></svg></div>
+        <div class="delete-btn" title="Удалить"><svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></div>
       </div>`;
-    d.querySelector('.edit-btn').onclick = () => editTaskInline(t, d);
-    d.querySelector('.delete-btn').onclick = () => deleteTask(t.id);
+    d.querySelector('.edit-btn').onclick=()=>editTaskInline(t,d);
+    d.querySelector('.delete-btn').onclick=()=>deleteTask(t.id);
+    d.querySelector('.add-subtask-btn').onclick=()=>addSubtask(t.id);
     container.appendChild(d);
-  });
-}
 
-function escapeHtml(str) {
-  return str.replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+    const subRes=await fetch(`${API_URL}/get_subtasks?id=${t.id}`);
+    const subtasks=await subRes.json();
+    if(Array.isArray(subtasks)&&subtasks.length){
+      subtasks.forEach(s=>{
+        const sub=document.createElement('div');
+        sub.className='subtask';
+        sub.innerHTML=`<div class="flex-1 small">${escapeHtml(s.task)}</div><div class="icon-btn"><div class="edit-btn" title="Изменить подзадачу"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M4 13.5V19h5.5l9.536-9.536a1.5 1.5 0 00-2.122-2.122L4 13.5z"/></svg></div><div class="delete-btn" title="Удалить подзадачу"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></div></div>`;
+        sub.querySelector('.edit-btn').onclick=()=>editSubtaskInline(s,sub);
+        sub.querySelector('.delete-btn').onclick=()=>deleteSubtask(s.id);
+        container.appendChild(sub);
+      });
+    }
+  }
 }
-document.getElementById('refreshTasks').onclick = loadTasks;
-
+function escapeHtml(str){return str.replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));}
+document.getElementById('refreshTasks').onclick=loadTasks;
 </script>
 </body>
 </html>
+
+

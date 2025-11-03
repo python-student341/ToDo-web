@@ -6,7 +6,7 @@ from datetime import timedelta
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
 def hashing_password(password: str):
-    return pwd_context.hash(password[:20])
+    return pwd_context.hash(password[:25])
 
 #Token
 config = AuthXConfig()

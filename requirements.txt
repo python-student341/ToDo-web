@@ -47,3 +47,4 @@ typing_extensions==4.15.0
 uvicorn==0.35.0
 envparse
 asyncpg
+psycopg2-binary

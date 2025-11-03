@@ -2,10 +2,10 @@ from sqlalchemy import select, delete
 from fastapi import Response, APIRouter, Cookie, HTTPException
 from datetime import datetime
 
-from schemas.schemas import UserSchema, UserLoginSchema, PasswordSchema, UserDeleteSchema, UserNameSchema
-from models.models import UserModel, ToDoModel, SubToDoModel
-from database.database import session_dep
-from database.hash import pwd_context, security, config, hashing_password
+from backend.schemas.schemas import UserSchema, UserLoginSchema, PasswordSchema, UserDeleteSchema, UserNameSchema
+from backend.models.models import UserModel, ToDoModel, SubToDoModel
+from backend.database.database import session_dep
+from backend.database.hash import pwd_context, security, config, hashing_password
 
 
 router = APIRouter()

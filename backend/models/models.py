@@ -2,7 +2,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import ForeignKey
 from datetime import datetime
 
-from database.database import Base
+from backend.database.database import Base
 
 class UserModel(Base):
     __tablename__ = 'users'

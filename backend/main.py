@@ -5,8 +5,14 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 from backend.api.router import main_router
+from backend.database.database import engine, Base
 
 app = FastAPI()
+
+@app.on_event("startup")
+async def on_startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 app.add_middleware(
     CORSMiddleware,

@@ -93,12 +93,17 @@ async def change_subtask(id: int, data: SubToDoSchema, session: session_dep, tok
     user_id = int(payload.sub)
     todo_id = id
 
-    todo = await session.get(SubToDoModel, id)
+    subtask = await session.get(SubToDoModel, id)
+    todo = await session.get(ToDoModel, subtask.todo_id)
+
+    if not subtask:
+        return {'success': False, 'message': 'Subtask not found'}
+
     if not todo:
         return {'success': False, 'message': 'Task not found'}
 
-#    if todo.todo_id != user_id:
-#       return {'success': False, 'message': 'You can only change your own tasks'}
+    if todo.user_id != user_id:
+       return {'success': False, 'message': 'You can only change your own tasks'}
 
     query = select(SubToDoModel).where(SubToDoModel.id == id)
     result = await session.execute(query)

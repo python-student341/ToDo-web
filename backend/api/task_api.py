@@ -1,10 +1,10 @@
 from fastapi import Cookie, APIRouter
 from sqlalchemy import select, delete
 
-from backend.schemas.schemas import ToDoSchema
-from backend.models.models import ToDoModel
-from backend.database.database import session_dep
-from backend.database.hash import security
+from schemas.schemas import ToDoSchema
+from models.models import ToDoModel
+from database.database import session_dep
+from database.hash import security
 
 router = APIRouter()
 

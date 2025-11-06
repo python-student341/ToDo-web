@@ -1,10 +1,10 @@
 from fastapi import Cookie, APIRouter
 from sqlalchemy import select, delete
 
-from backend.schemas.schemas import SubToDoSchema
-from backend.models.models import SubToDoModel, ToDoModel
-from backend.database.database import session_dep
-from backend.database.hash import security
+from schemas.schemas import SubToDoSchema
+from models.models import SubToDoModel, ToDoModel
+from database.database import session_dep
+from database.hash import security
 
 router = APIRouter()
 
@@ -44,12 +44,11 @@ async def get_subtasks(id: int, session: session_dep, token: str = Cookie(None))
     user_id = int(payload.sub)
     todo_id = id
 
-    subtask = await session.get(SubToDoModel, id)    
-    if not subtask:
+    todo = await session.get(ToDoModel, id)    
+    if not todo:
         return {'success': False, 'message': 'Task not found'}
 
-    todo = await session.get(ToDoModel, subtask.todo_id)
-    if not todo or todo.user_id != user_id:
+    if todo.user_id != user_id:
         return {'success': False, 'message': 'You can only change your own tasks'}
 
     query = select(SubToDoModel).where(SubToDoModel.todo_id == todo_id)

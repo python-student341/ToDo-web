@@ -4,8 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 
-from backend.api.router import main_router
-from backend.database.database import engine, Base
+from api.router import main_router
+from database.database import engine, Base
 
 app = FastAPI()
 
